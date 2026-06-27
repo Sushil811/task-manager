@@ -4,11 +4,10 @@ import { apiFetch } from "@/lib/api";
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { GraduationCap, BookOpen, Clock, TrendingUp, Plus, Trash2, Edit2, Play } from "lucide-react";
+import { GraduationCap, BookOpen, Clock, TrendingUp, Plus, Trash2 } from "lucide-react";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { useRouter } from "next/navigation";
-import { FocusTimer } from "@/components/features/focus-timer";
 
 interface ClassSchedule {
   _id: string;
@@ -16,10 +15,9 @@ interface ClassSchedule {
   type: string;
   room: string;
   time: string;
-  days: string[];
-  color: string;
   credits: number;
-  grade: string;
+  grade?: string;
+  resourceLink?: string;
 }
 
 interface Task {
@@ -38,37 +36,14 @@ export default function StudentPage() {
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   
-  // Class Form State
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // New Class Form State
   const [newCourse, setNewCourse] = useState("");
   const [newType, setNewType] = useState("Lecture");
   const [newRoom, setNewRoom] = useState("");
   const [newTime, setNewTime] = useState("");
-  const [newDays, setNewDays] = useState<string[]>([]);
-  const [newColor, setNewColor] = useState("bg-emerald-500");
-  const [newCredits, setNewCredits] = useState(3);
-  const [newGrade, setNewGrade] = useState("N/A");
-  const [showTimer, setShowTimer] = useState(false);
-
-  // Helper for GPA calculation
-  const calculateGPA = () => {
-    const gradePoints: Record<string, number> = {
-      'A+': 4.0, 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
-      'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'F': 0.0
-    };
-    
-    let totalPoints = 0;
-    let totalCredits = 0;
-
-    classes.forEach(c => {
-      if (c.grade && c.grade !== 'N/A' && gradePoints[c.grade] !== undefined) {
-        totalPoints += (gradePoints[c.grade] * (c.credits || 3));
-        totalCredits += (c.credits || 3);
-      }
-    });
-
-    return totalCredits === 0 ? "N/A" : (totalPoints / totalCredits).toFixed(2);
-  };
+  const [newCredits, setNewCredits] = useState<number>(3);
+  const [newGrade, setNewGrade] = useState("");
+  const [newLink, setNewLink] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,73 +71,38 @@ export default function StudentPage() {
     fetchData();
   }, []);
 
-  const resetForm = () => {
-    setEditingId(null);
-    setNewCourse("");
-    setNewRoom("");
-    setNewTime("");
-    setNewType("Lecture");
-    setNewDays([]);
-    setNewColor("bg-emerald-500");
-    setNewCredits(3);
-    setNewGrade("N/A");
-    setIsCreating(false);
-  };
-
-  const handleEditClass = (c: ClassSchedule) => {
-    setEditingId(c._id);
-    setNewCourse(c.course);
-    setNewRoom(c.room || "");
-    setNewTime(c.time);
-    setNewType(c.type);
-    setNewDays(c.days || []);
-    setNewColor(c.color || "bg-emerald-500");
-    setNewCredits(c.credits || 3);
-    setNewGrade(c.grade || "N/A");
-    setIsCreating(true);
-  };
-
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourse.trim() || !newTime.trim()) return;
     
-    const payload = { 
-      course: newCourse, 
-      type: newType, 
-      room: newRoom || 'TBD', 
-      time: newTime,
-      days: newDays,
-      color: newColor,
-      credits: newCredits,
-      grade: newGrade
-    };
-
     try {
-      if (editingId) {
-        const res = await apiFetch(`/student/classes/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setClasses(classes.map(c => c._id === editingId ? data : c));
-          resetForm();
-        }
-      } else {
-        const res = await apiFetch('/student/classes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setClasses([...classes, data]);
-          resetForm();
-        }
+      const res = await apiFetch('/student/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          course: newCourse, 
+          type: newType, 
+          room: newRoom || 'TBD', 
+          time: newTime,
+          credits: newCredits,
+          grade: newGrade || undefined,
+          resourceLink: newLink || undefined
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClasses([...classes, data]);
+        setNewCourse("");
+        setNewRoom("");
+        setNewTime("");
+        setNewType("Lecture");
+        setNewCredits(3);
+        setNewGrade("");
+        setNewLink("");
+        setIsCreating(false);
       }
     } catch (err) {
-      console.error("Failed to save class", err);
+      console.error("Failed to create class", err);
     }
   };
 
@@ -182,7 +122,52 @@ export default function StudentPage() {
 
   // Find the most urgent study task
   const studyTasks = tasks.filter(t => t.status !== 'Done');
-  const urgentTask = studyTasks.length > 0 ? studyTasks[0] : null;
+  
+  // Sort tasks by due date
+  const sortedTasks = [...studyTasks].sort((a, b) => {
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  });
+  
+  const urgentTask = sortedTasks.length > 0 ? sortedTasks[0] : null;
+
+  // Calculate dynamic GPA
+  const calculateGPA = () => {
+    let totalPoints = 0;
+    let totalCredits = 0;
+    const gradeScale: Record<string, number> = {
+      'A+': 4.0, 'A': 4.0, 'A-': 3.7,
+      'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+      'C+': 2.3, 'C': 2.0, 'C-': 1.7,
+      'D+': 1.3, 'D': 1.0, 'F': 0.0
+    };
+
+    classes.forEach(c => {
+      if (c.grade && gradeScale[c.grade] !== undefined) {
+        totalPoints += gradeScale[c.grade] * (c.credits || 3);
+        totalCredits += (c.credits || 3);
+      }
+    });
+
+    if (totalCredits === 0) return "N/A";
+    return (totalPoints / totalCredits).toFixed(2);
+  };
+
+  const getCountdownString = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const due = new Date(dateStr).getTime();
+    const now = new Date().getTime();
+    const diff = due - now;
+    
+    if (diff <= 0) return "Past Due!";
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (days > 0) return `Due in ${days}d ${hours}h`;
+    return `Due in ${hours}h`;
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -223,66 +208,43 @@ export default function StudentPage() {
           <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
             <TrendingUp className="w-6 h-6 text-emerald-500" />
           </div>
-          <div className="text-4xl font-bold">{calculateGPA()}</div>
+          <div className="text-3xl font-bold">{calculateGPA()}</div>
           <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium mt-1">Current GPA</div>
         </AnimatedCard>
 
         <AnimatedCard className="p-6 md:col-span-3 bg-gradient-to-r from-emerald-500/5 to-transparent border-emerald-500/20">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2 text-emerald-500 font-semibold mb-2">
-                <Clock className="w-5 h-5" />
-                Up Next
-              </div>
-              <h2 className="text-xl font-bold">{urgentTask ? urgentTask.title : "No upcoming assignments!"}</h2>
-              <p className="text-sm text-muted-foreground mt-2 mb-4">
-                {urgentTask && urgentTask.description ? urgentTask.description : "You're all caught up on your coursework. Great job!"}
-              </p>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-emerald-500 font-semibold">
+              <Clock className="w-5 h-5" />
+              Up Next
             </div>
-            <AnimatedButton 
-              variant="outline" 
-              className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-white"
-              onClick={() => setShowTimer(!showTimer)}
-            >
-              <Play className="w-4 h-4 mr-2" />
-              {showTimer ? "Hide Timer" : "Study Now"}
-            </AnimatedButton>
-          </div>
-
-          <AnimatePresence>
-            {showTimer && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden mt-4 pt-4 border-t border-border"
-              >
-                <FocusTimer />
-              </motion.div>
+            {urgentTask && urgentTask.dueDate && (
+              <span className="text-xs font-medium px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded-full">
+                {getCountdownString(urgentTask.dueDate)}
+              </span>
             )}
-          </AnimatePresence>
-
-          {!showTimer && (
-            <>
-              <div className="w-full h-2 bg-muted rounded-full overflow-hidden mt-2">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: urgentTask ? (urgentTask.status === 'In Progress' ? '50%' : '10%') : '100%' }}
-                  className="h-full bg-emerald-500 rounded-full"
-                />
-              </div>
-              <div className="text-xs text-muted-foreground mt-2 text-right">
-                {urgentTask ? (urgentTask.status === 'In Progress' ? 'In Progress' : 'Not Started') : 'Complete'}
-              </div>
-            </>
-          )}
+          </div>
+          <h2 className="text-xl font-bold">{urgentTask ? urgentTask.title : "No upcoming assignments!"}</h2>
+          <p className="text-sm text-muted-foreground mt-2 mb-4">
+            {urgentTask && urgentTask.description ? urgentTask.description : "You're all caught up on your coursework. Great job!"}
+          </p>
+          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: urgentTask ? (urgentTask.status === 'In Progress' ? '50%' : '10%') : '100%' }}
+              className="h-full bg-emerald-500 rounded-full"
+            />
+          </div>
+          <div className="text-xs text-muted-foreground mt-2 text-right">
+            {urgentTask ? (urgentTask.status === 'In Progress' ? 'In Progress' : 'Not Started') : 'Complete'}
+          </div>
         </AnimatedCard>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold tracking-tight">Your Classes</h2>
-          <AnimatedButton variant="outline" size="sm" onClick={() => { if(isCreating) resetForm(); else setIsCreating(true); }}>
+          <h2 className="text-xl font-semibold tracking-tight">Today&apos;s Schedule</h2>
+          <AnimatedButton variant="outline" size="sm" onClick={() => setIsCreating(!isCreating)}>
             {isCreating ? 'Cancel' : <><Plus className="w-4 h-4 mr-2" /> Add Class</>}
           </AnimatedButton>
         </div>
@@ -293,54 +255,23 @@ export default function StudentPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden mb-6"
+              className="overflow-hidden mb-4"
             >
-              <AnimatedCard className="p-5 border-emerald-500/20 bg-emerald-500/5">
-                <form onSubmit={handleCreateClass} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-medium mb-1 block">Course Name</label>
+              <AnimatedCard className="p-4 border-emerald-500/20 bg-emerald-500/5">
+                <form onSubmit={handleCreateClass} className="flex flex-col gap-4">
+                  <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="flex-1 w-full">
+                      <label className="text-xs font-medium mb-1 block">Course</label>
                       <input 
                         type="text" 
                         value={newCourse}
                         onChange={(e) => setNewCourse(e.target.value)}
-                        placeholder="e.g. Data Structures" 
+                        placeholder="Computer Architecture" 
                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Type</label>
-                      <select
-                        value={newType}
-                        onChange={(e) => setNewType(e.target.value)}
-                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                      >
-                        <option>Lecture</option>
-                        <option>Tutorial</option>
-                        <option>Lab</option>
-                        <option>Focus</option>
-                        <option>Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Color Label</label>
-                      <select
-                        value={newColor}
-                        onChange={(e) => setNewColor(e.target.value)}
-                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                      >
-                        <option value="bg-emerald-500">Emerald</option>
-                        <option value="bg-blue-500">Blue</option>
-                        <option value="bg-purple-500">Purple</option>
-                        <option value="bg-rose-500">Rose</option>
-                        <option value="bg-amber-500">Amber</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
+                    <div className="flex-1 w-full">
                       <label className="text-xs font-medium mb-1 block">Time</label>
                       <input 
                         type="text" 
@@ -351,17 +282,20 @@ export default function StudentPage() {
                         required
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Days (e.g. Mon, Wed)</label>
-                      <input 
-                        type="text" 
-                        value={newDays.join(', ')}
-                        onChange={(e) => setNewDays(e.target.value.split(',').map(d => d.trim()).filter(Boolean))}
-                        placeholder="Mon, Wed" 
+                    <div className="w-full md:w-32">
+                      <label className="text-xs font-medium mb-1 block">Type</label>
+                      <select
+                        value={newType}
+                        onChange={(e) => setNewType(e.target.value)}
                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                      />
+                      >
+                        <option>Lecture</option>
+                        <option>Tutorial</option>
+                        <option>Lab</option>
+                        <option>Focus</option>
+                      </select>
                     </div>
-                    <div>
+                    <div className="flex-1 w-full">
                       <label className="text-xs font-medium mb-1 block">Room</label>
                       <input 
                         type="text" 
@@ -371,37 +305,52 @@ export default function StudentPage() {
                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <div className="w-1/2">
-                        <label className="text-xs font-medium mb-1 block">Credits</label>
-                        <input 
-                          type="number" 
-                          min="0"
-                          max="6"
-                          value={newCredits}
-                          onChange={(e) => setNewCredits(Number(e.target.value))}
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                      <div className="w-1/2">
-                        <label className="text-xs font-medium mb-1 block">Grade</label>
-                        <select
-                          value={newGrade}
-                          onChange={(e) => setNewGrade(e.target.value)}
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                        >
-                          <option>N/A</option>
-                          <option>A+</option><option>A</option><option>A-</option>
-                          <option>B+</option><option>B</option><option>B-</option>
-                          <option>C+</option><option>C</option><option>C-</option>
-                          <option>D+</option><option>D</option><option>F</option>
-                        </select>
-                      </div>
-                    </div>
                   </div>
-                  <div className="flex justify-end pt-2">
-                    <AnimatedButton type="submit" className="w-full md:w-auto h-9 bg-emerald-500 text-white">
-                      {editingId ? "Save Changes" : "Add Class"}
+                  
+                  <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="w-full md:w-32">
+                      <label className="text-xs font-medium mb-1 block">Credits</label>
+                      <input 
+                        type="number"
+                        min="1" max="6"
+                        value={newCredits}
+                        onChange={(e) => setNewCredits(parseInt(e.target.value) || 3)}
+                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div className="w-full md:w-32">
+                      <label className="text-xs font-medium mb-1 block">Grade</label>
+                      <select
+                        value={newGrade}
+                        onChange={(e) => setNewGrade(e.target.value)}
+                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="">N/A</option>
+                        <option value="A+">A+</option>
+                        <option value="A">A</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B">B</option>
+                        <option value="B-">B-</option>
+                        <option value="C+">C+</option>
+                        <option value="C">C</option>
+                        <option value="C-">C-</option>
+                        <option value="D">D</option>
+                        <option value="F">F</option>
+                      </select>
+                    </div>
+                    <div className="flex-1 w-full">
+                      <label className="text-xs font-medium mb-1 block">Resource Link</label>
+                      <input 
+                        type="url" 
+                        value={newLink}
+                        onChange={(e) => setNewLink(e.target.value)}
+                        placeholder="https://canvas.instructure.com/..." 
+                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <AnimatedButton type="submit" className="w-full md:w-auto h-9 bg-emerald-500 text-white mt-4 md:mt-0">
+                      Save Class
                     </AnimatedButton>
                   </div>
                 </form>
@@ -419,46 +368,37 @@ export default function StudentPage() {
              </div>
           ) : (
             classes.map((item) => (
-              <AnimatedCard key={item._id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 group relative overflow-hidden" hoverEffect={false}>
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${item.color || 'bg-emerald-500'}`} />
-                <div className="w-24 font-mono text-sm font-medium text-muted-foreground pl-2">
+              <AnimatedCard key={item._id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 group" hoverEffect={false}>
+                <div className="w-24 font-mono text-sm font-medium text-muted-foreground">
                   {item.time}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-base">{item.course}</h3>
-                    {item.grade && item.grade !== 'N/A' && (
-                      <span className="px-2 py-0.5 rounded-full bg-muted text-xs font-medium border border-border">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-sm">{item.course}</h3>
+                    {item.grade && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                         {item.grade}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5 flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <BookOpen className="w-3.5 h-3.5" />
-                      {item.type}
-                    </span>
-                    {item.days && item.days.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {item.days.join(', ')}
-                      </span>
-                    )}
-                    <span className="px-1.5 py-0.5 rounded-md bg-muted/50 border border-border/50">
-                      {item.room}
-                    </span>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <BookOpen className="w-3 h-3" />
+                    <span>{item.type}</span>
+                    <span className="w-1 h-1 rounded-full bg-muted-foreground"></span>
+                    <span>{item.room}</span>
+                    <span className="w-1 h-1 rounded-full bg-muted-foreground"></span>
+                    <span>{item.credits} Credits</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <AnimatedButton variant="outline" size="sm" onClick={() => router.push('/notes')} className="hidden sm:flex mr-2">
+                <div className="flex items-center gap-2">
+                  {item.resourceLink && (
+                    <AnimatedButton variant="outline" size="sm" onClick={() => window.open(item.resourceLink, '_blank')} className="hidden sm:flex text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10">
+                      Open Link
+                    </AnimatedButton>
+                  )}
+                  <AnimatedButton variant="outline" size="sm" onClick={() => router.push('/notes')} className="hidden sm:flex">
                     Notes
                   </AnimatedButton>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleEditClass(item); }}
-                    className="p-1.5 text-muted-foreground hover:text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-md hover:bg-emerald-500/10"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
                   <button 
                     onClick={(e) => handleDeleteClass(item._id, e)}
                     className="p-1.5 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-md hover:bg-red-500/10"

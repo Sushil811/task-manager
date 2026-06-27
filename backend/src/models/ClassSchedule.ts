@@ -6,10 +6,9 @@ export interface IClassSchedule extends Document {
   type: 'Lecture' | 'Tutorial' | 'Focus' | 'Lab' | 'Other';
   room: string;
   time: string;
-  days: string[];
-  color: string;
   credits: number;
-  grade: string;
+  grade?: string;
+  resourceLink?: string;
 }
 
 const ClassScheduleSchema: Schema = new Schema(
@@ -23,10 +22,9 @@ const ClassScheduleSchema: Schema = new Schema(
     },
     room: { type: String, default: 'TBD' },
     time: { type: String, required: true },
-    days: { type: [String], default: [] },
-    color: { type: String, default: 'bg-emerald-500' },
     credits: { type: Number, default: 3 },
-    grade: { type: String, default: 'N/A' }
+    grade: { type: String },
+    resourceLink: { type: String }
   },
   { timestamps: true }
 );
