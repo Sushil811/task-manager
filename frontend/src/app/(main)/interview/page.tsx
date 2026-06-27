@@ -255,28 +255,40 @@ export default function InterviewPage() {
   };
 
   const handleRunCode = async () => {
-    const output: string[] = [];
+    let output: string[] = [];
+    setCodeOutput(["Executing..."]);
     
     if (selectedLanguage === 'JavaScript') {
-      const originalConsoleLog = console.log;
+      const originalLog = console.log;
+      const originalError = console.error;
+      const originalWarn = console.warn;
       
-      console.log = (...args: unknown[]) => {
+      const captureLog = (...args: unknown[]) => {
         output.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
-        originalConsoleLog(...args);
+        setCodeOutput([...output]);
       };
 
+      console.log = captureLog;
+      console.error = (...args) => { captureLog("Error:", ...args); };
+      console.warn = (...args) => { captureLog("Warn:", ...args); };
+
       try {
-        const fn = new Function(code);
-        fn();
+        // Use AsyncFunction to allow top-level await in user code
+        const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+        const fn = new AsyncFunction(code);
+        await fn();
+        
         if (output.length === 0) {
-          output.push("Execution completed. (No output)");
+          setCodeOutput(["Execution completed. (No output)"]);
         }
       } catch (err: unknown) {
-        output.push(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        output.push(`Runtime Error: ${err instanceof Error ? err.message : String(err)}`);
+        setCodeOutput([...output]);
+      } finally {
+        console.log = originalLog;
+        console.error = originalError;
+        console.warn = originalWarn;
       }
-
-      console.log = originalConsoleLog;
-      setCodeOutput(output);
     } else {
       // Send to AI mock executor
       setCodeOutput(["Executing on AI server..."]);
@@ -799,6 +811,18 @@ export default function InterviewPage() {
                         <textarea 
                           value={code}
                           onChange={(e) => setCode(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Tab') {
+                              e.preventDefault();
+                              const target = e.target as HTMLTextAreaElement;
+                              const start = target.selectionStart;
+                              const end = target.selectionEnd;
+                              setCode(code.substring(0, start) + "  " + code.substring(end));
+                              setTimeout(() => {
+                                target.selectionStart = target.selectionEnd = start + 2;
+                              }, 0);
+                            }
+                          }}
                           placeholder={`// Write or paste your ${selectedLanguage} code here...`}
                           className={`w-full bg-[#0d0d0d] text-[#e5e5e5] font-mono text-sm p-4 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none shadow-inner transition-all ${isFullScreen ? 'h-full' : 'h-full min-h-[250px]'}`}
                           spellCheck="false"
