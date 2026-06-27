@@ -79,11 +79,14 @@ export default function LandingPage() {
               Start for free <ArrowRight className="w-5 h-5 ml-2" />
             </AnimatedButton>
           </Link>
-          <a href="mailto:demo@taskflowai.com">
-            <AnimatedButton size="lg" variant="outline" className="rounded-full h-14 px-8 text-lg glass border-white/20 w-full sm:w-auto">
-              Book a Demo
-            </AnimatedButton>
-          </a>
+          <AnimatedButton 
+            size="lg" 
+            variant="outline" 
+            className="rounded-full h-14 px-8 text-lg glass border-white/20 w-full sm:w-auto"
+            onClick={() => window.location.href = "mailto:demo@taskflowai.com"}
+          >
+            Book a Demo
+          </AnimatedButton>
         </motion.div>
 
         {/* Floating Interactive Dashboard Preview */}
