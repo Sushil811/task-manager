@@ -65,6 +65,38 @@ router.post('/review-code', async (req: any, res) => {
   try {
     const { code, problemTitle, language } = req.body;
     
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-1.5-flash", 
+          generationConfig: { responseMimeType: "application/json" } 
+        });
+        
+        const prompt = `You are an expert AI Coding Tutor. Review the following ${language || 'JavaScript'} code for the problem "${problemTitle || 'Unknown'}".
+          
+          Code:
+          ${code}
+          
+          Return a JSON object with exactly these fields:
+          "overall": A short, encouraging summary of how they did (string)
+          "explanation": A detailed explanation of what the code does well and where it can improve (string)
+          "rating": A score from 1 to 10 (number)
+          "timeComplexity": An analysis of the time complexity, e.g. O(N) (string)
+          "spaceComplexity": An analysis of the space complexity, e.g. O(1) (string)
+          "suggestions": An array of 2-3 specific suggestions for improvement (array of strings)`;
+          
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        const feedback = JSON.parse(responseText);
+        
+        return res.json(feedback);
+      } catch (apiErr) {
+        console.error("Gemini API Error, falling back to mock review:", apiErr);
+      }
+    }
+
     // Simulate AI processing delay
     await new Promise(r => setTimeout(r, 2000));
 
