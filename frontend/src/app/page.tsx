@@ -6,7 +6,8 @@ import { AnimatedButton } from "@/components/ui/animated-button";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { ArrowRight, Brain, Calendar, CheckCircle, Clock, Search, Sparkles, Target, Zap } from "lucide-react";
 import Link from "next/link";
-
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/30">
@@ -79,14 +80,14 @@ export default function LandingPage() {
               Start for free <ArrowRight className="w-5 h-5 ml-2" />
             </AnimatedButton>
           </Link>
-          <AnimatedButton 
-            size="lg" 
-            variant="outline" 
-            className="rounded-full h-14 px-8 text-lg glass border-white/20 w-full sm:w-auto"
-            onClick={() => window.location.href = "mailto:demo@taskflowai.com"}
+          <motion.a 
+            href="mailto:demo@taskflowai.com"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={cn(buttonVariants({ size: "lg", variant: "outline" }), "rounded-full h-14 px-8 text-lg glass border-white/20 w-full sm:w-auto")}
           >
             Book a Demo
-          </AnimatedButton>
+          </motion.a>
         </motion.div>
 
         {/* Floating Interactive Dashboard Preview */}
