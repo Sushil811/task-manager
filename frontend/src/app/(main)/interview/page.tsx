@@ -16,6 +16,8 @@ interface JobApplication {
   role: string;
   status: 'Applied' | 'Phone Screen' | 'Take-home' | 'Onsite' | 'Offer' | 'Rejected';
   appliedDate: string;
+  nextInterviewDate?: string;
+  link?: string;
 }
 
 interface CodingProblem {
@@ -38,6 +40,8 @@ export default function InterviewPage() {
   const [isCreatingApp, setIsCreatingApp] = useState(false);
   const [newCompany, setNewCompany] = useState("");
   const [newRole, setNewRole] = useState("");
+  const [newLink, setNewLink] = useState("");
+  const [newDate, setNewDate] = useState("");
 
   // Code Review Modal State
   const [selectedProblem, setSelectedProblem] = useState<CodingProblem | null>(null);
@@ -97,17 +101,42 @@ export default function InterviewPage() {
       const res = await apiFetch('/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: newCompany, role: newRole, status: 'Applied' })
+        body: JSON.stringify({ 
+          company: newCompany, 
+          role: newRole, 
+          status: 'Applied',
+          link: newLink || undefined,
+          nextInterviewDate: newDate || undefined
+        })
       });
       if (res.ok) {
         const data = await res.json();
         setApplications([data, ...applications]);
         setNewCompany("");
         setNewRole("");
+        setNewLink("");
+        setNewDate("");
         setIsCreatingApp(false);
       }
     } catch (err) {
       console.error("Failed to create application", err);
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const res = await apiFetch(`/applications/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        setApplications(applications.map(app => 
+          app._id === id ? { ...app, status: newStatus as any } : app
+        ));
+      }
+    } catch (err) {
+      console.error("Failed to update status", err);
     }
   };
 
@@ -312,6 +341,21 @@ export default function InterviewPage() {
 
   const activeApplications = applications.filter(a => a.status !== 'Rejected' && a.status !== 'Offer');
   
+  // Find upcoming interview
+  const upcomingApps = applications
+    .filter(a => a.nextInterviewDate)
+    .sort((a, b) => new Date(a.nextInterviewDate!).getTime() - new Date(b.nextInterviewDate!).getTime())
+    .filter(a => new Date(a.nextInterviewDate!).getTime() > new Date().getTime());
+  const nextInterview = upcomingApps.length > 0 ? upcomingApps[0] : null;
+
+  const getCountdownString = (dateStr: string) => {
+    const diff = new Date(dateStr).getTime() - new Date().getTime();
+    if (diff <= 0) return "Starting soon";
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    return days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+  };
+  
   const solvedProbs = problems.filter(p => p.status === 'Solved').length;
   const totalProbs = problems.length;
   const fillPercentage = totalProbs === 0 ? 0 : Math.round((solvedProbs / totalProbs) * 100);
@@ -346,19 +390,25 @@ export default function InterviewPage() {
           <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
             <Brain className="w-32 h-32" />
           </div>
-          <h2 className="text-xl font-semibold mb-2">Upcoming: Google SWE Mock</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            {nextInterview ? `Upcoming: ${nextInterview.company} - ${nextInterview.role}` : "No upcoming interviews scheduled."}
+          </h2>
           <p className="text-muted-foreground text-sm mb-6 max-w-md">
-            System Design focus on Distributed Caching. Scheduled for tomorrow at 2:00 PM.
+            {nextInterview 
+              ? `Your next interview for ${nextInterview.company} is approaching. Review your notes and practice coding problems.`
+              : "Keep applying! Your next big opportunity is just around the corner."}
           </p>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm font-medium bg-background/50 px-3 py-1.5 rounded-full border border-border">
-              <Clock className="w-4 h-4 text-purple-500" />
-              18h 45m 12s
+          {nextInterview && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm font-medium bg-background/50 px-3 py-1.5 rounded-full border border-border">
+                <Clock className="w-4 h-4 text-purple-500" />
+                {getCountdownString(nextInterview.nextInterviewDate!)}
+              </div>
+              <AnimatedButton onClick={() => router.push('/notes')} className="bg-purple-500 text-white shadow-lg shadow-purple-500/25">
+                Review Materials
+              </AnimatedButton>
             </div>
-            <AnimatedButton onClick={() => router.push('/notes')} className="bg-purple-500 text-white shadow-lg shadow-purple-500/25">
-              Review Materials
-            </AnimatedButton>
-          </div>
+          )}
         </AnimatedCard>
 
         <AnimatedCard className="p-6 flex flex-col justify-center items-center text-center">
@@ -399,24 +449,45 @@ export default function InterviewPage() {
               >
                 <AnimatedCard className="p-4 border-primary/20 bg-primary/5">
                   <form onSubmit={handleCreateApp} className="flex flex-col gap-3">
-                    <div>
-                      <input 
-                        type="text" 
-                        value={newCompany}
-                        onChange={(e) => setNewCompany(e.target.value)}
-                        placeholder="Company (e.g. OpenAI)" 
-                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary"
-                        autoFocus
-                      />
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <input 
+                          type="text" 
+                          value={newCompany}
+                          onChange={(e) => setNewCompany(e.target.value)}
+                          placeholder="Company (e.g. OpenAI)" 
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input 
+                          type="text" 
+                          value={newRole}
+                          onChange={(e) => setNewRole(e.target.value)}
+                          placeholder="Role (e.g. Frontend Engineer)" 
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <input 
-                        type="text" 
-                        value={newRole}
-                        onChange={(e) => setNewRole(e.target.value)}
-                        placeholder="Role (e.g. Frontend Engineer)" 
-                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary"
-                      />
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <input 
+                          type="url" 
+                          value={newLink}
+                          onChange={(e) => setNewLink(e.target.value)}
+                          placeholder="Job Posting Link" 
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input 
+                          type="datetime-local" 
+                          value={newDate}
+                          onChange={(e) => setNewDate(e.target.value)}
+                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary text-muted-foreground"
+                        />
+                      </div>
                     </div>
                     <AnimatedButton type="submit" className="w-full h-9">
                       Save Application
@@ -438,20 +509,41 @@ export default function InterviewPage() {
               applications.map((app) => {
                 const styles = getStatusColor(app.status);
                 return (
-                  <AnimatedCard key={app._id} className="p-4 flex items-center justify-between group cursor-pointer" hoverEffect={false}>
+                  <AnimatedCard key={app._id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between group gap-4" hoverEffect={false}>
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                         <Briefcase className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-sm">{app.company}</h3>
-                        <p className="text-xs text-muted-foreground">{app.role}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <p className="text-xs text-muted-foreground">{app.role}</p>
+                          {app.nextInterviewDate && (
+                            <span className="text-[10px] text-purple-500 font-medium">
+                              Interview: {new Date(app.nextInterviewDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[10px] px-2 py-1 rounded-full font-semibold uppercase tracking-wider ${styles.bg} ${styles.color}`}>
-                        {app.status}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {app.link && (
+                        <AnimatedButton variant="outline" size="sm" onClick={() => window.open(app.link, '_blank')} className="hidden sm:flex text-blue-500 border-blue-500/20 hover:bg-blue-500/10">
+                          Job Posting
+                        </AnimatedButton>
+                      )}
+                      <select
+                        value={app.status}
+                        onChange={(e) => handleUpdateStatus(app._id, e.target.value)}
+                        className={`text-[10px] px-2 py-1 rounded-md font-semibold uppercase tracking-wider focus:outline-none appearance-none cursor-pointer ${styles.bg} ${styles.color} border border-transparent hover:border-current/20`}
+                      >
+                        <option value="Applied">Applied</option>
+                        <option value="Phone Screen">Phone Screen</option>
+                        <option value="Take-home">Take-home</option>
+                        <option value="Onsite">Onsite</option>
+                        <option value="Offer">Offer</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
                       <button 
                         onClick={(e) => handleDeleteApp(app._id, e)}
                         className="p-1.5 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-md hover:bg-red-500/10"
