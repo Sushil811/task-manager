@@ -22,16 +22,42 @@ router.get('/classes', async (req: any, res) => {
 // POST a new class
 router.post('/classes', async (req: any, res) => {
   try {
-    const { course, type, room, time } = req.body;
+    const { course, type, room, time, days, color, credits, grade } = req.body;
     const newClass = new ClassSchedule({
       user: req.user.id,
       course,
       type,
       room,
-      time
+      time,
+      days: days || [],
+      color: color || 'bg-emerald-500',
+      credits: credits !== undefined ? credits : 3,
+      grade: grade || 'N/A'
     });
     const savedClass = await newClass.save();
     res.json(savedClass);
+  } catch (err: any) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// PUT (update) an existing class
+router.put('/classes/:id', async (req: any, res) => {
+  try {
+    const { course, type, room, time, days, color, credits, grade } = req.body;
+    let classItem = await ClassSchedule.findById(req.params.id);
+    if (!classItem) return res.status(404).json({ msg: 'Class not found' });
+    if (classItem.user.toString() !== req.user.id) {
+      return res.status(401).json({ msg: 'User not authorized' });
+    }
+
+    classItem = await ClassSchedule.findByIdAndUpdate(
+      req.params.id,
+      { $set: { course, type, room, time, days, color, credits, grade } },
+      { new: true }
+    );
+    res.json(classItem);
   } catch (err: any) {
     console.error(err.message);
     res.status(500).send('Server Error');
