@@ -93,9 +93,36 @@ router.post('/review-code', async (req: any, res) => {
 router.post('/generate-problem', async (req: any, res) => {
   try {
     const { topic } = req.body;
-    await new Promise(r => setTimeout(r, 1000));
     
-    // Read from the dynamically generated problems dataset
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        // Use gemini-1.5-flash for fast, JSON-structured responses
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-1.5-flash", 
+          generationConfig: { responseMimeType: "application/json" } 
+        });
+        
+        const prompt = `Generate a coding interview problem about ${topic && topic !== 'Random' ? topic : "a random data structure and algorithm topic"}. 
+          Return a JSON object with exactly these fields:
+          "title": A catchy title (string)
+          "topic": The core topic (string, e.g. "Arrays", "Dynamic Programming", "Trees")
+          "difficulty": Either "Easy", "Medium", or "Hard" (string)
+          "description": The full problem statement formatted in Markdown. It must include an overarching story/context, Example 1, Example 2, and Constraints.`;
+          
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        const problem = JSON.parse(responseText);
+        
+        return res.json(problem);
+      } catch (apiErr) {
+        console.error("Gemini API Error, falling back to local file:", apiErr);
+      }
+    }
+    
+    // Fallback: Read from the dynamically generated problems dataset
+    await new Promise(r => setTimeout(r, 1000));
     const problemsPath = path.join(__dirname, '../../data/problems.json');
     let problems = [];
     if (fs.existsSync(problemsPath)) {
