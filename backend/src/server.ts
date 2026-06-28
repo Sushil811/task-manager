@@ -27,17 +27,22 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/taskflow-a
 const connectDB = async () => {
   if (mongoose.connection.readyState >= 1) return;
   try {
-    await mongoose.connect(MONGO_URI);
+    await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 });
     console.log('Successfully connected to MongoDB.');
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
+    throw error;
   }
 };
 
 // Middleware to ensure DB connection on serverless requests
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ msg: 'Database connection failed. Please check backend environment variables.' });
+  }
 });
 
 // Only start the server if we're not in a serverless environment (Vercel)
