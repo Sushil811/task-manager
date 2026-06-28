@@ -70,7 +70,7 @@ router.post('/review-code', async (req: any, res) => {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ 
-          model: "gemini-1.5-flash", 
+          model: "gemini-flash-latest", 
           generationConfig: { responseMimeType: "application/json" } 
         });
         
@@ -131,9 +131,9 @@ router.post('/generate-problem', async (req: any, res) => {
       try {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // Use gemini-1.5-flash for fast, JSON-structured responses
+        // Use gemini-flash-latest for fast, JSON-structured responses
         const model = genAI.getGenerativeModel({ 
-          model: "gemini-1.5-flash", 
+          model: "gemini-flash-latest", 
           generationConfig: { responseMimeType: "application/json" } 
         });
         
