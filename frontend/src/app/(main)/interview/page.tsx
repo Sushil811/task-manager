@@ -2,7 +2,7 @@
 import { apiFetch } from "@/lib/api";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Target, Briefcase, Brain, Clock, Plus, Trash2, Code2, CheckCircle2, X, Sparkles, Play, Save, Terminal, Wand2, Maximize2, Minimize2 } from "lucide-react";
@@ -67,6 +67,16 @@ export default function InterviewPage() {
   const [isCreatingProb, setIsCreatingProb] = useState(false);
   const [newProbTitle, setNewProbTitle] = useState("");
   const [newProbDiff, setNewProbDiff] = useState("Medium");
+
+  const reviewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (reviewResult && reviewRef.current) {
+      setTimeout(() => {
+        reviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+  }, [reviewResult]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -306,15 +316,36 @@ export default function InterviewPage() {
     if (!selectedProblem) return;
     setIsSaving(true);
     try {
+      // Evaluate if the solution is correct using the AI Tutor
+      let isCorrect = false;
+      try {
+        const aiRes = await apiFetch('/ai/review-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, problemTitle: selectedProblem.title, language: selectedLanguage })
+        });
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          setReviewResult(aiData); // Pre-fill the AI feedback so the user sees it
+          isCorrect = !!aiData.isCorrect;
+        }
+      } catch (err) {
+        console.error("Verification failed", err);
+      }
+
+      if (!isCorrect) {
+        alert("Your solution is incorrect or incomplete. It has been saved as 'Attempted'. Check the AI feedback for hints!");
+      }
+
       const res = await apiFetch(`/coding/${selectedProblem._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ solutionCode: code, status: 'Solved', language: selectedLanguage })
+        body: JSON.stringify({ solutionCode: code, status: isCorrect ? 'Solved' : 'Attempted', language: selectedLanguage })
       });
       if (res.ok) {
         const updated = await res.json();
         setProblems(problems.map(p => p._id === updated._id ? updated : p));
-        setSelectedProblem(null);
+        if (isCorrect) setSelectedProblem(null);
       }
     } catch (err) {
       console.error("Failed to save solution", err);
@@ -740,8 +771,8 @@ export default function InterviewPage() {
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col h-full gap-6">
-                <div className={`grid grid-cols-1 ${isFullScreen ? 'lg:grid-cols-2' : 'lg:grid-cols-2'} gap-6 h-full`}>
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-6">
+                <div className={`grid grid-cols-1 ${isFullScreen ? 'lg:grid-cols-2' : 'lg:grid-cols-2'} gap-6 flex-1 min-h-[600px]`}>
                   
                   {/* Left Pane: Problem Description */}
                   <div className="flex flex-col h-full bg-black/30 rounded-xl border border-white/5 shadow-inner overflow-hidden relative">
@@ -861,9 +892,10 @@ export default function InterviewPage() {
                 <AnimatePresence>
                   {reviewResult && (
                     <motion.div 
+                      ref={reviewRef}
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
-                      className="overflow-hidden"
+                      className="overflow-hidden shrink-0"
                     >
                       <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 p-6 rounded-xl space-y-4">
                         <div className="flex items-center justify-between pb-2 border-b border-blue-500/10">
@@ -904,9 +936,9 @@ export default function InterviewPage() {
                         <div className="mt-4">
                           <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Suggestions & Edge Cases</div>
                           <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                            {reviewResult.suggestions.map((s: string, i: number) => (
+                            {Array.isArray(reviewResult.suggestions) ? reviewResult.suggestions.map((s: string, i: number) => (
                               <li key={i}>{s}</li>
-                            ))}
+                            )) : null}
                           </ul>
                         </div>
                       </div>

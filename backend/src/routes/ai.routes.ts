@@ -86,7 +86,8 @@ router.post('/review-code', async (req: any, res) => {
           "rating": A score from 1 to 10 (number)
           "timeComplexity": An analysis of the time complexity, e.g. O(N) (string)
           "spaceComplexity": An analysis of the space complexity, e.g. O(1) (string)
-          "suggestions": An array of 2-3 specific suggestions for improvement (array of strings)`;
+          "suggestions": An array of 2-3 specific suggestions for improvement (array of strings)
+          "isCorrect": A strict boolean value (true or false). It MUST be false if the provided code solves a DIFFERENT problem than "${problemTitle}", even if the code itself is syntactically valid. It MUST be false if the code is incomplete or fails to meet the core requirements of "${problemTitle}". It MUST be true ONLY if the code is a fully working solution for exactly "${problemTitle}".`;
           
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
@@ -110,10 +111,10 @@ router.post('/review-code', async (req: any, res) => {
       timeComplexity: "O(N^2) - Consider using a Hash Map to reduce this to O(N).",
       spaceComplexity: "O(1) - Excellent, you are doing this in-place.",
       suggestions: [
-        "What happens if the input is empty?",
-        "Use more descriptive variable names.",
-        "Consider extracting the inner loop into a helper function for readability."
-      ]
+        "Ensure your loop condition prevents out-of-bounds errors.",
+        "Consider if the input array can be empty and handle that edge case."
+      ],
+      isCorrect: false
     };
     
     res.json(feedback);
