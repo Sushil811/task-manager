@@ -89,7 +89,8 @@ router.post('/review-code', async (req: any, res) => {
           
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
-        const feedback = JSON.parse(responseText);
+        const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const feedback = JSON.parse(cleanedText);
         
         return res.json(feedback);
       } catch (apiErr) {
@@ -145,7 +146,9 @@ router.post('/generate-problem', async (req: any, res) => {
           
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
-        const problem = JSON.parse(responseText);
+        // Strip out potential markdown formatting that Gemini sometimes wraps JSON in
+        const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const problem = JSON.parse(cleanedText);
         
         return res.json(problem);
       } catch (apiErr) {
