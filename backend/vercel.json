@@ -3,14 +3,12 @@
   "builds": [
     {
       "src": "src/server.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "data/problems.json"
+      }
     }
   ],
-  "functions": {
-    "src/server.ts": {
-      "includeFiles": "data/problems.json"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
