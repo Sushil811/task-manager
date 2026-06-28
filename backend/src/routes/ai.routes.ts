@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
+import CodingProblem from '../models/CodingProblem';
 
 const router = express.Router();
 
@@ -137,7 +138,7 @@ router.post('/generate-problem', async (req: any, res) => {
           generationConfig: { responseMimeType: "application/json" } 
         });
         
-        const prompt = `Generate a coding interview problem about ${topic && topic !== 'Random' ? topic : "a random data structure and algorithm topic"}. 
+        const prompt = `Generate an important and highly frequently asked coding interview problem about ${topic && topic !== 'Random' ? topic : "a random data structure and algorithm topic"}. This MUST be a real, well-known problem that top tech companies (like FAANG) frequently ask in their technical interviews.
           Return a JSON object with exactly these fields:
           "title": A catchy title (string)
           "topic": The core topic (string, e.g. "Arrays", "Dynamic Programming", "Trees")
@@ -150,7 +151,17 @@ router.post('/generate-problem', async (req: any, res) => {
         const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const problem = JSON.parse(cleanedText);
         
-        return res.json(problem);
+        // Save to Database automatically
+        const newProblem = new CodingProblem({
+          user: req.user.id,
+          title: problem.title,
+          difficulty: problem.difficulty || 'Medium',
+          status: 'To Do',
+          description: problem.description
+        });
+        const savedProblem = await newProblem.save();
+        
+        return res.json(savedProblem);
       } catch (apiErr) {
         console.error("Gemini API Error, falling back to local file:", apiErr);
       }
@@ -173,7 +184,18 @@ router.post('/generate-problem', async (req: any, res) => {
     if (filteredProblems.length === 0) filteredProblems = problems;
     
     const randomProblem = filteredProblems[Math.floor(Math.random() * filteredProblems.length)];
-    res.json(randomProblem);
+    
+    // Save to Database automatically
+    const newFallbackProblem = new CodingProblem({
+      user: req.user.id,
+      title: randomProblem.title,
+      difficulty: randomProblem.difficulty || 'Medium',
+      status: 'To Do',
+      description: randomProblem.description
+    });
+    const savedFallbackProblem = await newFallbackProblem.save();
+    
+    res.json(savedFallbackProblem);
   } catch (err: any) {
     console.error(err.message);
     res.status(500).send('Server Error');

@@ -236,16 +236,8 @@ export default function InterviewPage() {
       if (aiRes.ok) {
         const generated = await aiRes.json();
         
-        // 2. Save it to DB
-        const res = await apiFetch('/coding', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: generated.title, difficulty: generated.difficulty, status: 'To Do', description: generated.description })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setProblems([data, ...problems]);
-        }
+        // The backend now saves it to the DB automatically and returns the saved document
+        setProblems([generated, ...problems]);
       }
     } catch (err) {
       console.error("Failed to generate problem", err);
