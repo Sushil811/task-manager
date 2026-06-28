@@ -8,7 +8,7 @@ import { ArrowLeft, Mail, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_URL } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -144,7 +144,7 @@ export default function SignupPage() {
             </div>
 
             <motion.a 
-              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/google`}
+              href={`${API_URL}/auth/google`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className={cn(buttonVariants({ variant: "outline" }), "w-full h-12 glass flex items-center justify-center font-medium")}
@@ -159,7 +159,7 @@ export default function SignupPage() {
             </motion.a>
             
             <motion.a 
-              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/github`}
+              href={`${API_URL}/auth/github`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className={cn(buttonVariants({ variant: "outline" }), "w-full h-12 glass flex items-center justify-center font-medium")}
