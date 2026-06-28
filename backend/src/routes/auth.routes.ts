@@ -109,39 +109,24 @@ router.put('/me', authMiddleware, async (req: any, res: any) => {
 
 import passport from 'passport';
 
-// MOCK OAuth Flow for Demo purposes
-const mockOAuthHandler = async (req: any, res: any, provider: string) => {
-  try {
-    const email = `demo.${provider}@taskflow.ai`;
-    let user = await User.findOne({ email });
-    
-    if (!user) {
-      user = new User({
-        name: `Demo ${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-        email,
-        authProvider: provider,
-        providerId: `mock_${provider}_123`,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${provider}`
-      });
-      await user.save();
-    }
-    
-    const payload = { user: { id: user.id } };
-    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
-    
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/oauth-callback?token=${token}`);
-  } catch (err) {
-    console.error(err);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/login?error=true`);
-  }
-};
+// Google OAuth
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-// Google OAuth (Mock)
-router.get('/google', (req, res) => mockOAuthHandler(req, res, 'google'));
+router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: '/login?error=true' }), (req: any, res: any) => {
+  const payload = { user: { id: req.user.id } };
+  const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  res.redirect(`${frontendUrl}/oauth-callback?token=${token}`);
+});
 
-// GitHub OAuth (Mock)
-router.get('/github', (req, res) => mockOAuthHandler(req, res, 'github'));
+// GitHub OAuth
+router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
+
+router.get('/github/callback', passport.authenticate('github', { session: false, failureRedirect: '/login?error=true' }), (req: any, res: any) => {
+  const payload = { user: { id: req.user.id } };
+  const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  res.redirect(`${frontendUrl}/oauth-callback?token=${token}`);
+});
 
 export default router;
