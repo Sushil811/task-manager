@@ -34,8 +34,11 @@ const connectDB = async () => {
   }
 };
 
-// Connect to DB immediately
-connectDB();
+// Middleware to ensure DB connection on serverless requests
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
 
 // Only start the server if we're not in a serverless environment (Vercel)
 if (process.env.NODE_ENV !== 'production') {
@@ -64,3 +67,4 @@ app.use('/api/student', studentRoutes);
 app.use('/api/coding', codingRoutes);
 
 export default app;
+module.exports = app;
