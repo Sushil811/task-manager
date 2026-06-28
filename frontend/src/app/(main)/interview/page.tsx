@@ -132,7 +132,7 @@ export default function InterviewPage() {
       });
       if (res.ok) {
         setApplications(applications.map(app => 
-          app._id === id ? { ...app, status: newStatus as any } : app
+          app._id === id ? { ...app, status: newStatus as JobApplication['status'] } : app
         ));
       }
     } catch (err) {
@@ -255,7 +255,7 @@ export default function InterviewPage() {
   };
 
   const handleRunCode = async () => {
-    let output: string[] = [];
+    const output: string[] = [];
     setCodeOutput(["Executing..."]);
     
     if (selectedLanguage === 'JavaScript') {
