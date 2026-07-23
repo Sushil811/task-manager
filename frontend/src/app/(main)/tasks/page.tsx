@@ -146,7 +146,7 @@ export default function TasksPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12 h-full flex flex-col relative">
+    <div className="max-w-6xl w-full mx-auto space-y-6 h-[calc(100vh-112px)] flex flex-col relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <motion.h1 

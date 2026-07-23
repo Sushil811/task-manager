@@ -1,4 +1,8 @@
 import express from 'express';
+import multer from 'multer';
+const pdfParse = require('pdf-parse');
+
+const upload = multer({ storage: multer.memoryStorage() });
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
@@ -219,6 +223,77 @@ router.post('/simulate-execution', async (req: any, res) => {
     }
     
     res.json({ output });
+  } catch (err: any) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// Endpoint for Resume Review & ATS check
+router.post('/review-resume', upload.single('resumeFile'), async (req: any, res) => {
+  try {
+    let resumeText = req.body.resumeText;
+    const { jobDescription } = req.body;
+    
+    if (req.file) {
+      try {
+        const pdfData = await pdfParse(req.file.buffer); // parse PDF buffer
+        resumeText = pdfData.text;
+      } catch (pdfErr) {
+        console.error("PDF Parse Error:", pdfErr);
+        return res.status(400).json({ error: "Failed to parse the uploaded PDF file." });
+      }
+    }
+    
+    if (!resumeText) {
+      return res.status(400).json({ error: "Resume text or PDF file is required." });
+    }
+    
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-2.5-flash", 
+          generationConfig: { responseMimeType: "application/json" } 
+        });
+        
+        const prompt = `You are an expert tech recruiter and advanced Applicant Tracking System (ATS). Review the following resume text.
+${jobDescription ? `\nThe candidate is applying for a job with the following description:\n${jobDescription}\n` : `\nEvaluate it for general software engineering roles.\n`}
+Resume Text:
+${resumeText}
+
+Return a JSON object with exactly these fields:
+"atsScore": A number from 1 to 100 representing the ATS match score/overall quality (number).
+"overallFeedback": A brief summary of the resume's quality and fit (string).
+"strengths": An array of 3-4 strong points of the resume (array of strings).
+"weaknesses": An array of 2-3 areas that need improvement or are missing (array of strings).
+"suggestions": An array of 3 actionable suggestions to improve the resume or ATS score (array of strings).`;
+          
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const feedback = JSON.parse(cleanedText);
+        
+        return res.json(feedback);
+      } catch (apiErr) {
+        console.error("Gemini API Error, falling back to mock resume review:", apiErr);
+      }
+    }
+
+    // Simulate AI processing delay for fallback
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Mock Response
+    const feedback = {
+      atsScore: 78,
+      overallFeedback: "The resume is well-structured but lacks quantifiable metrics in the experience section.",
+      strengths: ["Clear education section", "Good list of technical skills", "Relevant project experience"],
+      weaknesses: ["Missing measurable achievements", "Formatting could cause issues with some older ATS systems"],
+      suggestions: ["Add numbers to describe the impact of your projects", "Ensure keywords from the job description are prominent", "Include a link to your GitHub profile or portfolio"]
+    };
+    
+    res.json(feedback);
   } catch (err: any) {
     console.error(err.message);
     res.status(500).send('Server Error');

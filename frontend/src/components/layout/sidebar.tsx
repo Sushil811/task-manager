@@ -12,7 +12,8 @@ import {
   Target, 
   Settings,
   BookOpen,
-  PieChart
+  PieChart,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Analytics", href: "/analytics", icon: PieChart },
   { name: "Interview & Coding", href: "/interview", icon: Target },
   { name: "Student Mode", href: "/student", icon: GraduationCap },
+  { name: "Resume Reviewer", href: "/resume", icon: FileText },
 ];
 
 export function Sidebar() {

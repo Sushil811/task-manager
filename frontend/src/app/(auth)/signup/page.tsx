@@ -42,9 +42,9 @@ export default function SignupPage() {
 
       localStorage.setItem("token", data.token);
       router.push("/dashboard");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("An error occurred during signup. Please try again.");
+      setError(err.message || "An error occurred during signup. Please try again.");
     } finally {
       setLoading(false);
     }

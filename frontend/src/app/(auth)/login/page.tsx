@@ -41,9 +41,9 @@ export default function LoginPage() {
 
       localStorage.setItem("token", data.token);
       router.push("/dashboard");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("An error occurred during login. Please try again.");
+      setError(err.message || "An error occurred during login. Please try again.");
     } finally {
       setLoading(false);
     }
